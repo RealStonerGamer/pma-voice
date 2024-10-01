@@ -2,7 +2,7 @@
 	<body>
 		<audio id="audio_on" src="mic_click_on.ogg"></audio>
 		<audio id="audio_off" src="mic_click_off.ogg"></audio>
-		<div v-if="voice.uiEnabled" class="voiceInfo">
+		<div class="voiceInfo">
 			<p v-if="voice.callInfo !== 0" :class="{ talking: voice.talking }">
 				[Call]
 			</p>
@@ -22,30 +22,22 @@ export default {
 	name: "App",
 	setup() {
 		const voice = reactive({
-			uiEnabled: true,
 			voiceModes: [],
 			voiceMode: 0,
 			radioChannel: 0,
-			radioEnabled: true,
+			radioEnabled: false,
 			usingRadio: false,
 			callInfo: 0,
 			talking: false,
 		});
 
 		// stops from toggling voice at the end of talking
+		let usingUpdated = false
 		window.addEventListener("message", function(event) {
 			const data = event.data;
 
-			if (data.uiEnabled !== undefined) {
-				voice.uiEnabled = data.uiEnabled
-			}
-
 			if (data.voiceModes !== undefined) {
 				voice.voiceModes = JSON.parse(data.voiceModes);
-				// Push our own custom type for modes that have their range changed
-				let voiceModes = [...voice.voiceModes]
-				voiceModes.push([0.0, "Custom"])
-				voice.voiceModes = voiceModes
 			}
 
 			if (data.voiceMode !== undefined) {
@@ -64,15 +56,19 @@ export default {
 				voice.callInfo = data.callInfo;
 			}
 
-			if (data.usingRadio !== undefined && data.usingRadio !== voice.usingRadio) {
-				voice.usingRadio = data.usingRadio;
+			if (data.usingRadio !== voice.usingRadio) {
+				usingUpdated = true
+				voice.usingRadio = data.usingRadio
+				setTimeout(function(){
+					usingUpdated = false
+				}, 100)
 			}
 			
-			if ((data.talking !== undefined) && !voice.usingRadio) {
-				voice.talking = data.talking;
+			if ((data.talking !== undefined) && !voice.usingRadio && !usingUpdated){
+				voice.talking = data.talking
 			}
 
-			if (data.sound && voice.radioEnabled && voice.radioChannel !== 0) {
+			if (data.sound && voice.radioEnabled) {
 				let click = document.getElementById(data.sound);
 				// discard these errors as its usually just a 'uncaught promise' from two clicks happening too fast.
 				click.load();
@@ -81,10 +77,8 @@ export default {
 			}
 		});
 
-		fetch(`https://${GetParentResourceName()}/uiReady`, { method: 'POST' });
-
 		return { voice };
-	}
+	},
 };
 </script>
 
